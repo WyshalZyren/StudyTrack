@@ -6,30 +6,20 @@ from tkinter import messagebox, ttk
 from uuid import uuid4
 
 
-# PATHS
-
 BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = BASE_DIR / "study_data.json"
 
-# COLORS
-
 BACKGROUND = "#F4F7FB"
 WHITE = "#FFFFFF"
-
 NAVY = "#14213D"
 NAVY_HOVER = "#243A5E"
-
 TEXT = "#1F2937"
 GRAY = "#667085"
 BORDER = "#D6DCE5"
-
 GREEN = "#188038"
 RED = "#C62828"
-
 LIGHT_BUTTON = "#E8ECF2"
 LIGHT_BUTTON_HOVER = "#D8DEE8"
-
-# DATA
 
 study_sessions = []
 
@@ -74,6 +64,7 @@ def normalize_session(session):
         minutes = int(
             session.get("minutes", 0)
         )
+
     except (TypeError, ValueError):
         minutes = 0
 
@@ -124,9 +115,9 @@ def load_sessions():
 
         study_sessions = loaded_sessions
 
-        # Save again so older data gets upgraded
-        # with IDs and normalized fields.
-        save_sessions(show_error=False)
+        save_sessions(
+            show_error=False
+        )
 
     except json.JSONDecodeError:
         study_sessions = []
@@ -142,7 +133,7 @@ def load_sessions():
 
         messagebox.showwarning(
             "Data Loading Error",
-            f"StudyTrack could not load the saved sessions.\n\n{error}",
+            f"StudyTrack could not load saved sessions.\n\n{error}",
         )
 
 
@@ -171,7 +162,6 @@ def save_sessions(show_error=True):
 
         return False
 
-# HELPERS
 
 def format_total_time(total_minutes):
     hours = total_minutes // 60
@@ -252,8 +242,6 @@ def validate_session(subject, minutes_text):
     return minutes
 
 
-# SESSION ACTIONS
-
 def add_session():
     subject = (
         subject_entry
@@ -301,6 +289,7 @@ def add_session():
         study_sessions.pop()
         return
 
+    update_date_filter()
     refresh_table()
     update_statistics()
     clear_inputs()
@@ -324,15 +313,15 @@ def delete_selected():
 
     selected_item = selected_items[0]
 
-    session_id = session_table.item(
+    tags = session_table.item(
         selected_item,
         "tags",
     )
 
-    if not session_id:
+    if not tags:
         return
 
-    session_id = session_id[0]
+    session_id = tags[0]
 
     confirm = messagebox.askyesno(
         "Delete Session",
@@ -342,25 +331,27 @@ def delete_selected():
     if not confirm:
         return
 
-    session_to_delete = None
+    selected_session = None
 
     for session in study_sessions:
         if session.get("id") == session_id:
-            session_to_delete = session
+            selected_session = session
             break
 
-    if session_to_delete is None:
+    if selected_session is None:
         messagebox.showerror(
             "Delete Error",
             "The selected session could not be found.",
         )
+
         return
 
     study_sessions.remove(
-        session_to_delete
+        selected_session
     )
 
     save_sessions()
+    update_date_filter()
     refresh_table()
     update_statistics()
 
@@ -391,6 +382,7 @@ def clear_all_sessions():
     study_sessions.clear()
 
     save_sessions()
+    update_date_filter()
     refresh_table()
     update_statistics()
 
@@ -399,15 +391,84 @@ def clear_all_sessions():
         fg=RED,
     )
 
-# TABLE
+
+def session_matches_search(
+    session,
+    search_term,
+):
+    if not search_term:
+        return True
+
+    values = [
+        session.get("subject", ""),
+        session.get("notes", ""),
+        session.get("date", ""),
+        session.get("time", ""),
+        str(session.get("minutes", "")),
+    ]
+
+    combined = " ".join(
+        str(value).lower()
+        for value in values
+    )
+
+    return search_term in combined
 
 
-def refresh_table():
+def session_matches_date(
+    session,
+    selected_date,
+):
+    if selected_date == "All Dates":
+        return True
+
+    return (
+        session.get("date", "")
+        == selected_date
+    )
+
+
+def refresh_table(event=None):
     for row in session_table.get_children():
         session_table.delete(row)
 
+    search_term = (
+        search_var
+        .get()
+        .strip()
+        .lower()
+    )
+
+    selected_date = (
+        date_filter_var
+        .get()
+        .strip()
+    )
+
+    matching_sessions = []
+
+    for session in study_sessions:
+        matches_search = (
+            session_matches_search(
+                session,
+                search_term,
+            )
+        )
+
+        matches_date = (
+            session_matches_date(
+                session,
+                selected_date,
+            )
+        )
+
+        if matches_search and matches_date:
+            matching_sessions.append(
+                session
+            )
+
     for index, session in enumerate(
-        study_sessions,
+        matching_sessions,
         start=1,
     ):
         session_table.insert(
@@ -426,8 +487,61 @@ def refresh_table():
             ),
         )
 
+    if (
+        search_term
+        or selected_date != "All Dates"
+    ):
+        search_count_label.config(
+            text=(
+                f"{len(matching_sessions)} "
+                f"of {len(study_sessions)} session(s)"
+            )
+        )
 
-# STATISTICS
+    else:
+        search_count_label.config(
+            text=f"{len(study_sessions)} session(s)"
+        )
+
+
+def update_date_filter():
+    dates = sorted(
+        {
+            session.get("date", "")
+            for session in study_sessions
+            if session.get("date", "")
+        },
+        reverse=True,
+    )
+
+    values = [
+        "All Dates",
+        *dates,
+    ]
+
+    current_value = (
+        date_filter_var.get()
+    )
+
+    date_filter_combo[
+        "values"
+    ] = values
+
+    if current_value not in values:
+        date_filter_var.set(
+            "All Dates"
+        )
+
+
+def clear_filters():
+    search_var.set("")
+    date_filter_var.set(
+        "All Dates"
+    )
+
+    refresh_table()
+
+    search_entry.focus_set()
 
 
 def update_statistics():
@@ -462,7 +576,7 @@ def update_statistics():
 
         return
 
-    subjects = {}
+    subject_totals = {}
 
     for session in study_sessions:
         subject = session.get(
@@ -477,8 +591,8 @@ def update_statistics():
             )
         )
 
-        subjects[subject] = (
-            subjects.get(
+        subject_totals[subject] = (
+            subject_totals.get(
                 subject,
                 0,
             )
@@ -486,8 +600,8 @@ def update_statistics():
         )
 
     top_subject = max(
-        subjects,
-        key=subjects.get,
+        subject_totals,
+        key=subject_totals.get,
     )
 
     top_subject_value.config(
@@ -495,28 +609,57 @@ def update_statistics():
     )
 
 
-# WINDOW
+def create_stat_card(
+    parent,
+    title,
+):
+    card = tk.Frame(
+        parent,
+        bg=WHITE,
+        highlightbackground=BORDER,
+        highlightthickness=1,
+    )
+
+    title_widget = tk.Label(
+        card,
+        text=title,
+        font=(
+            "Segoe UI",
+            9,
+        ),
+        fg=GRAY,
+        bg=WHITE,
+    )
+
+    title_widget.pack(
+        pady=(13, 3)
+    )
+
+    value_widget = tk.Label(
+        card,
+        text="--",
+        font=(
+            "Segoe UI",
+            17,
+            "bold",
+        ),
+        fg=TEXT,
+        bg=WHITE,
+    )
+
+    value_widget.pack(
+        pady=(0, 13)
+    )
+
+    return card, value_widget
+
 
 root = tk.Tk()
 
-root.title(
-    "StudyTrack"
-)
-
-root.geometry(
-    "1100x780"
-)
-
-root.minsize(
-    920,
-    680,
-)
-
-root.configure(
-    bg=BACKGROUND
-)
-
-# HEADER
+root.title("StudyTrack")
+root.geometry("1100x830")
+root.minsize(920, 700)
+root.configure(bg=BACKGROUND)
 
 
 header = tk.Frame(
@@ -525,13 +668,8 @@ header = tk.Frame(
     height=100,
 )
 
-header.pack(
-    fill="x"
-)
-
-header.pack_propagate(
-    False
-)
+header.pack(fill="x")
+header.pack_propagate(False)
 
 
 header_left = tk.Frame(
@@ -578,8 +716,6 @@ subtitle_label.pack(
     anchor="w"
 )
 
-# MAIN
-
 
 main = tk.Frame(
     root,
@@ -593,7 +729,6 @@ main.pack(
     pady=25,
 )
 
-# INPUT CARD
 
 input_card = tk.Frame(
     main,
@@ -646,7 +781,6 @@ fields_frame.pack(
     fill="x"
 )
 
-# SUBJECT
 
 subject_frame = tk.Frame(
     fields_frame,
@@ -694,7 +828,6 @@ subject_entry.pack(
     pady=(6, 0),
 )
 
-# MINUTES
 
 minutes_frame = tk.Frame(
     fields_frame,
@@ -740,8 +873,6 @@ minutes_entry.pack(
     pady=(6, 0),
 )
 
-# NOTES
-
 
 notes_label = tk.Label(
     input_content,
@@ -778,8 +909,6 @@ notes_text = tk.Text(
 notes_text.pack(
     fill="x"
 )
-
-# BUTTONS
 
 
 button_frame = tk.Frame(
@@ -853,7 +982,6 @@ status_label.pack(
     side="right"
 )
 
-# STATISTICS
 
 stats_frame = tk.Frame(
     main,
@@ -864,48 +992,6 @@ stats_frame.pack(
     fill="x",
     pady=(18, 0),
 )
-
-
-def create_stat_card(parent, title):
-    card = tk.Frame(
-        parent,
-        bg=WHITE,
-        highlightbackground=BORDER,
-        highlightthickness=1,
-    )
-
-    title_widget = tk.Label(
-        card,
-        text=title,
-        font=(
-            "Segoe UI",
-            9,
-        ),
-        fg=GRAY,
-        bg=WHITE,
-    )
-
-    title_widget.pack(
-        pady=(13, 3)
-    )
-
-    value_widget = tk.Label(
-        card,
-        text="--",
-        font=(
-            "Segoe UI",
-            17,
-            "bold",
-        ),
-        fg=TEXT,
-        bg=WHITE,
-    )
-
-    value_widget.pack(
-        pady=(0, 13)
-    )
-
-    return card, value_widget
 
 
 sessions_card, total_sessions_value = create_stat_card(
@@ -946,7 +1032,6 @@ subject_card.pack(
     padx=(8, 0),
 )
 
-# HISTORY CARD
 
 history_card = tk.Frame(
     main,
@@ -1035,7 +1120,130 @@ delete_button.pack(
     padx=8,
 )
 
-# HISTORY TABLE
+
+filter_frame = tk.Frame(
+    history_card,
+    bg=WHITE,
+)
+
+filter_frame.pack(
+    fill="x",
+    padx=20,
+    pady=(0, 12),
+)
+
+
+search_label = tk.Label(
+    filter_frame,
+    text="Search",
+    font=(
+        "Segoe UI",
+        9,
+        "bold",
+    ),
+    fg=TEXT,
+    bg=WHITE,
+)
+
+search_label.pack(
+    side="left",
+    padx=(0, 8),
+)
+
+
+search_var = tk.StringVar()
+
+
+search_entry = tk.Entry(
+    filter_frame,
+    textvariable=search_var,
+    width=28,
+    font=(
+        "Segoe UI",
+        10,
+    ),
+    relief="solid",
+    bd=1,
+)
+
+search_entry.pack(
+    side="left",
+    ipady=5,
+)
+
+
+date_filter_label = tk.Label(
+    filter_frame,
+    text="Date",
+    font=(
+        "Segoe UI",
+        9,
+        "bold",
+    ),
+    fg=TEXT,
+    bg=WHITE,
+)
+
+date_filter_label.pack(
+    side="left",
+    padx=(15, 8),
+)
+
+
+date_filter_var = tk.StringVar(
+    value="All Dates"
+)
+
+
+date_filter_combo = ttk.Combobox(
+    filter_frame,
+    textvariable=date_filter_var,
+    state="readonly",
+    width=15,
+)
+
+date_filter_combo.pack(
+    side="left"
+)
+
+
+clear_filters_button = tk.Button(
+    filter_frame,
+    text="Clear Filters",
+    command=clear_filters,
+    font=(
+        "Segoe UI",
+        9,
+    ),
+    fg=TEXT,
+    bg=LIGHT_BUTTON,
+    activebackground=LIGHT_BUTTON_HOVER,
+    relief="flat",
+    padx=12,
+    pady=5,
+)
+
+clear_filters_button.pack(
+    side="left",
+    padx=(10, 0),
+)
+
+
+search_count_label = tk.Label(
+    filter_frame,
+    text="0 session(s)",
+    font=(
+        "Segoe UI",
+        9,
+    ),
+    fg=GRAY,
+    bg=WHITE,
+)
+
+search_count_label.pack(
+    side="right"
+)
+
 
 table_frame = tk.Frame(
     history_card,
@@ -1164,7 +1372,6 @@ session_table.pack(
     expand=True,
 )
 
-# FOOTER
 
 footer = tk.Label(
     root,
@@ -1182,8 +1389,6 @@ footer.pack(
 )
 
 
-# KEYBOARD SHORTCUTS
-
 subject_entry.bind(
     "<Return>",
     lambda event: minutes_entry.focus_set(),
@@ -1196,13 +1401,23 @@ minutes_entry.bind(
 )
 
 
-# STARTUP
+search_var.trace_add(
+    "write",
+    lambda *args: refresh_table(),
+)
+
+
+date_filter_combo.bind(
+    "<<ComboboxSelected>>",
+    refresh_table,
+)
+
 
 load_sessions()
-
+update_date_filter()
 refresh_table()
-
 update_statistics()
+
 
 if study_sessions:
     status_label.config(

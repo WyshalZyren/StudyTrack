@@ -9,4 +9,5 @@ venv/
 .vscode/
 .idea/
 
+StudyTrack_*.csv
 study_data.json

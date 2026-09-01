@@ -1,8 +1,9 @@
+import csv
 import json
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 from uuid import uuid4
 
 
@@ -529,6 +530,80 @@ def clear_all_sessions():
     )
 
 
+def export_to_csv():
+    if not study_sessions:
+        messagebox.showinfo(
+            "No Sessions",
+            "There are no study sessions to export.",
+        )
+        return
+
+    default_filename = (
+        "StudyTrack_"
+        + datetime.now().strftime("%Y-%m-%d")
+        + ".csv"
+    )
+
+    file_path = filedialog.asksaveasfilename(
+        title="Export Study History",
+        defaultextension=".csv",
+        initialfile=default_filename,
+        filetypes=[
+            ("CSV Files", "*.csv"),
+            ("All Files", "*.*"),
+        ],
+    )
+
+    if not file_path:
+        return
+
+    try:
+        with open(
+            file_path,
+            "w",
+            newline="",
+            encoding="utf-8-sig",
+        ) as file:
+            writer = csv.writer(file)
+
+            writer.writerow(
+                [
+                    "Date",
+                    "Time",
+                    "Subject",
+                    "Minutes",
+                    "Notes",
+                ]
+            )
+
+            for session in study_sessions:
+                writer.writerow(
+                    [
+                        session.get("date", ""),
+                        session.get("time", ""),
+                        session.get("subject", ""),
+                        session.get("minutes", 0),
+                        session.get("notes", ""),
+                    ]
+                )
+
+        messagebox.showinfo(
+            "Export Complete",
+            "Study history was exported successfully.",
+        )
+
+        status_label.config(
+            text="Study history exported to CSV.",
+            fg=GREEN,
+        )
+
+    except OSError as error:
+        messagebox.showerror(
+            "Export Error",
+            f"StudyTrack could not export the file.\n\n{error}",
+        )
+
+
 def session_matches_search(
     session,
     search_term,
@@ -650,13 +725,9 @@ def update_date_filter():
         *dates,
     ]
 
-    current_value = (
-        date_filter_var.get()
-    )
+    current_value = date_filter_var.get()
 
-    date_filter_combo[
-        "values"
-    ] = values
+    date_filter_combo["values"] = values
 
     if current_value not in values:
         date_filter_var.set(
@@ -666,6 +737,7 @@ def update_date_filter():
 
 def clear_filters():
     search_var.set("")
+
     date_filter_var.set(
         "All Dates"
     )
@@ -1209,6 +1281,29 @@ clear_all_button.pack(
     side="right"
 )
 
+export_button = tk.Button(
+    history_header,
+    text="Export CSV",
+    command=export_to_csv,
+    font=(
+        "Segoe UI",
+        9,
+        "bold",
+    ),
+    fg=WHITE,
+    bg=GREEN,
+    activebackground="#12682A",
+    activeforeground=WHITE,
+    relief="flat",
+    padx=15,
+    pady=6,
+)
+
+export_button.pack(
+    side="right",
+    padx=8,
+)
+
 delete_button = tk.Button(
     history_header,
     text="Delete Selected",
@@ -1228,8 +1323,7 @@ delete_button = tk.Button(
 )
 
 delete_button.pack(
-    side="right",
-    padx=8,
+    side="right"
 )
 
 edit_button = tk.Button(
@@ -1251,7 +1345,8 @@ edit_button = tk.Button(
 )
 
 edit_button.pack(
-    side="right"
+    side="right",
+    padx=8,
 )
 
 filter_frame = tk.Frame(

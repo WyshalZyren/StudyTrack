@@ -607,6 +607,306 @@ def export_to_csv():
         )
 
 
+def build_subject_breakdown():
+    subject_data = {}
+
+    for session in study_sessions:
+        subject = (
+            session.get(
+                "subject",
+                "Unknown",
+            )
+            .strip()
+        )
+
+        if not subject:
+            subject = "Unknown"
+
+        minutes = int(
+            session.get(
+                "minutes",
+                0,
+            )
+        )
+
+        if subject not in subject_data:
+            subject_data[subject] = {
+                "sessions": 0,
+                "minutes": 0,
+            }
+
+        subject_data[subject][
+            "sessions"
+        ] += 1
+
+        subject_data[subject][
+            "minutes"
+        ] += minutes
+
+    breakdown = []
+
+    for subject, data in subject_data.items():
+        breakdown.append(
+            {
+                "subject": subject,
+                "sessions": data["sessions"],
+                "minutes": data["minutes"],
+            }
+        )
+
+    breakdown.sort(
+        key=lambda item: item["minutes"],
+        reverse=True,
+    )
+
+    return breakdown
+
+
+def open_subject_breakdown():
+    if not study_sessions:
+        messagebox.showinfo(
+            "No Sessions",
+            "There are no study sessions to summarize.",
+        )
+        return
+
+    breakdown = build_subject_breakdown()
+
+    window = tk.Toplevel(root)
+
+    window.title(
+        "Subject Breakdown"
+    )
+
+    window.geometry(
+        "650x500"
+    )
+
+    window.minsize(
+        550,
+        400,
+    )
+
+    window.configure(
+        bg=BACKGROUND
+    )
+
+    window.transient(root)
+
+    header_frame = tk.Frame(
+        window,
+        bg=NAVY,
+        height=80,
+    )
+
+    header_frame.pack(
+        fill="x"
+    )
+
+    header_frame.pack_propagate(
+        False
+    )
+
+    title = tk.Label(
+        header_frame,
+        text="Subject Breakdown",
+        font=(
+            "Segoe UI",
+            20,
+            "bold",
+        ),
+        fg=WHITE,
+        bg=NAVY,
+    )
+
+    title.pack(
+        pady=(13, 0)
+    )
+
+    subtitle = tk.Label(
+        header_frame,
+        text="Study time and session totals by subject",
+        font=(
+            "Segoe UI",
+            9,
+        ),
+        fg="#CDD6E5",
+        bg=NAVY,
+    )
+
+    subtitle.pack()
+
+    content = tk.Frame(
+        window,
+        bg=BACKGROUND,
+    )
+
+    content.pack(
+        fill="both",
+        expand=True,
+        padx=25,
+        pady=25,
+    )
+
+    summary_card = tk.Frame(
+        content,
+        bg=WHITE,
+        highlightbackground=BORDER,
+        highlightthickness=1,
+    )
+
+    summary_card.pack(
+        fill="x",
+        pady=(0, 15),
+    )
+
+    total_subjects = len(
+        breakdown
+    )
+
+    total_minutes = sum(
+        item["minutes"]
+        for item in breakdown
+    )
+
+    summary_text = (
+        f"{total_subjects} subject(s) • "
+        f"{format_total_time(total_minutes)} total study time"
+    )
+
+    summary_label = tk.Label(
+        summary_card,
+        text=summary_text,
+        font=(
+            "Segoe UI",
+            10,
+            "bold",
+        ),
+        fg=TEXT,
+        bg=WHITE,
+    )
+
+    summary_label.pack(
+        pady=14
+    )
+
+    table_card = tk.Frame(
+        content,
+        bg=WHITE,
+        highlightbackground=BORDER,
+        highlightthickness=1,
+    )
+
+    table_card.pack(
+        fill="both",
+        expand=True,
+    )
+
+    table_container = tk.Frame(
+        table_card,
+        bg=WHITE,
+    )
+
+    table_container.pack(
+        fill="both",
+        expand=True,
+        padx=15,
+        pady=15,
+    )
+
+    columns = (
+        "subject",
+        "sessions",
+        "minutes",
+        "time",
+    )
+
+    breakdown_table = ttk.Treeview(
+        table_container,
+        columns=columns,
+        show="headings",
+    )
+
+    breakdown_table.heading(
+        "subject",
+        text="Subject",
+    )
+
+    breakdown_table.heading(
+        "sessions",
+        text="Sessions",
+    )
+
+    breakdown_table.heading(
+        "minutes",
+        text="Minutes",
+    )
+
+    breakdown_table.heading(
+        "time",
+        text="Total Time",
+    )
+
+    breakdown_table.column(
+        "subject",
+        width=220,
+        anchor="w",
+    )
+
+    breakdown_table.column(
+        "sessions",
+        width=90,
+        anchor="center",
+    )
+
+    breakdown_table.column(
+        "minutes",
+        width=90,
+        anchor="center",
+    )
+
+    breakdown_table.column(
+        "time",
+        width=130,
+        anchor="center",
+    )
+
+    scrollbar = ttk.Scrollbar(
+        table_container,
+        orient="vertical",
+        command=breakdown_table.yview,
+    )
+
+    breakdown_table.configure(
+        yscrollcommand=scrollbar.set
+    )
+
+    scrollbar.pack(
+        side="right",
+        fill="y",
+    )
+
+    breakdown_table.pack(
+        side="left",
+        fill="both",
+        expand=True,
+    )
+
+    for item in breakdown:
+        breakdown_table.insert(
+            "",
+            tk.END,
+            values=(
+                item["subject"],
+                item["sessions"],
+                item["minutes"],
+                format_total_time(
+                    item["minutes"]
+                ),
+            ),
+        )
+
+
 def session_matches_search(
     session,
     search_term,
@@ -674,7 +974,9 @@ def refresh_table(event=None):
         )
 
         if matches_search and matches_date:
-            matching_sessions.append(session)
+            matching_sessions.append(
+                session
+            )
 
     for index, session in enumerate(
         matching_sessions,
@@ -750,6 +1052,7 @@ def clear_filters():
     )
 
     refresh_table()
+
     search_entry.focus_set()
 
 
@@ -780,11 +1083,16 @@ def update_statistics():
             )
         )
         for session in study_sessions
-        if session.get("date", "") == today
+        if session.get(
+            "date",
+            "",
+        ) == today
     )
 
     total_sessions_value.config(
-        text=str(total_sessions)
+        text=str(
+            total_sessions
+        )
     )
 
     total_time_value.config(
@@ -838,7 +1146,10 @@ def update_statistics():
     )
 
 
-def create_stat_card(parent, title):
+def create_stat_card(
+    parent,
+    title,
+):
     card = tk.Frame(
         parent,
         bg=WHITE,
@@ -885,7 +1196,11 @@ root = tk.Tk()
 root.title("StudyTrack")
 root.geometry("1150x830")
 root.minsize(950, 700)
-root.configure(bg=BACKGROUND)
+
+root.configure(
+    bg=BACKGROUND
+)
+
 
 header = tk.Frame(
     root,
@@ -893,8 +1208,14 @@ header = tk.Frame(
     height=100,
 )
 
-header.pack(fill="x")
-header.pack_propagate(False)
+header.pack(
+    fill="x"
+)
+
+header.pack_propagate(
+    False
+)
+
 
 header_left = tk.Frame(
     header,
@@ -906,6 +1227,7 @@ header_left.pack(
     padx=40,
     pady=18,
 )
+
 
 title_label = tk.Label(
     header_left,
@@ -923,6 +1245,7 @@ title_label.pack(
     anchor="w"
 )
 
+
 subtitle_label = tk.Label(
     header_left,
     text="Personal Study Session Tracker",
@@ -938,6 +1261,7 @@ subtitle_label.pack(
     anchor="w"
 )
 
+
 main = tk.Frame(
     root,
     bg=BACKGROUND,
@@ -950,6 +1274,7 @@ main.pack(
     pady=25,
 )
 
+
 input_card = tk.Frame(
     main,
     bg=WHITE,
@@ -961,6 +1286,7 @@ input_card.pack(
     fill="x"
 )
 
+
 input_content = tk.Frame(
     input_card,
     bg=WHITE,
@@ -971,6 +1297,7 @@ input_content.pack(
     padx=25,
     pady=20,
 )
+
 
 input_title = tk.Label(
     input_content,
@@ -989,6 +1316,7 @@ input_title.pack(
     pady=(0, 15),
 )
 
+
 fields_frame = tk.Frame(
     input_content,
     bg=WHITE,
@@ -997,6 +1325,7 @@ fields_frame = tk.Frame(
 fields_frame.pack(
     fill="x"
 )
+
 
 subject_frame = tk.Frame(
     fields_frame,
@@ -1009,6 +1338,7 @@ subject_frame.pack(
     expand=True,
     padx=(0, 10),
 )
+
 
 subject_label = tk.Label(
     subject_frame,
@@ -1026,6 +1356,7 @@ subject_label.pack(
     anchor="w"
 )
 
+
 subject_entry = tk.Entry(
     subject_frame,
     font=(
@@ -1042,6 +1373,7 @@ subject_entry.pack(
     pady=(6, 0),
 )
 
+
 minutes_frame = tk.Frame(
     fields_frame,
     bg=WHITE,
@@ -1051,6 +1383,7 @@ minutes_frame.pack(
     side="left",
     padx=(10, 0),
 )
+
 
 minutes_label = tk.Label(
     minutes_frame,
@@ -1068,6 +1401,7 @@ minutes_label.pack(
     anchor="w"
 )
 
+
 minutes_entry = tk.Entry(
     minutes_frame,
     width=15,
@@ -1083,6 +1417,7 @@ minutes_entry.pack(
     ipady=7,
     pady=(6, 0),
 )
+
 
 notes_label = tk.Label(
     input_content,
@@ -1100,6 +1435,7 @@ notes_label.pack(
     anchor="w",
     pady=(15, 6),
 )
+
 
 notes_text = tk.Text(
     input_content,
@@ -1119,6 +1455,7 @@ notes_text.pack(
     fill="x"
 )
 
+
 button_frame = tk.Frame(
     input_content,
     bg=WHITE,
@@ -1128,6 +1465,7 @@ button_frame.pack(
     fill="x",
     pady=(15, 0),
 )
+
 
 add_button = tk.Button(
     button_frame,
@@ -1151,6 +1489,7 @@ add_button.pack(
     side="left"
 )
 
+
 cancel_edit_button = tk.Button(
     button_frame,
     text="Cancel Edit",
@@ -1166,6 +1505,7 @@ cancel_edit_button = tk.Button(
     padx=20,
     pady=8,
 )
+
 
 clear_button = tk.Button(
     button_frame,
@@ -1188,6 +1528,7 @@ clear_button.pack(
     padx=10,
 )
 
+
 status_label = tk.Label(
     button_frame,
     text="Ready",
@@ -1203,6 +1544,7 @@ status_label.pack(
     side="right"
 )
 
+
 stats_frame = tk.Frame(
     main,
     bg=BACKGROUND,
@@ -1212,6 +1554,7 @@ stats_frame.pack(
     fill="x",
     pady=(18, 0),
 )
+
 
 sessions_card, total_sessions_value = create_stat_card(
     stats_frame,
@@ -1225,6 +1568,7 @@ sessions_card.pack(
     padx=(0, 6),
 )
 
+
 time_card, total_time_value = create_stat_card(
     stats_frame,
     "Total Study Time",
@@ -1236,6 +1580,7 @@ time_card.pack(
     expand=True,
     padx=6,
 )
+
 
 today_card, today_time_value = create_stat_card(
     stats_frame,
@@ -1249,6 +1594,7 @@ today_card.pack(
     padx=6,
 )
 
+
 subject_card, top_subject_value = create_stat_card(
     stats_frame,
     "Most Studied Subject",
@@ -1260,6 +1606,7 @@ subject_card.pack(
     expand=True,
     padx=(6, 0),
 )
+
 
 history_card = tk.Frame(
     main,
@@ -1274,6 +1621,7 @@ history_card.pack(
     pady=(18, 0),
 )
 
+
 history_header = tk.Frame(
     history_card,
     bg=WHITE,
@@ -1284,6 +1632,7 @@ history_header.pack(
     padx=20,
     pady=(15, 10),
 )
+
 
 history_title = tk.Label(
     history_header,
@@ -1300,6 +1649,7 @@ history_title = tk.Label(
 history_title.pack(
     side="left"
 )
+
 
 clear_all_button = tk.Button(
     history_header,
@@ -1320,6 +1670,7 @@ clear_all_button = tk.Button(
 clear_all_button.pack(
     side="right"
 )
+
 
 export_button = tk.Button(
     history_header,
@@ -1344,6 +1695,30 @@ export_button.pack(
     padx=8,
 )
 
+
+breakdown_button = tk.Button(
+    history_header,
+    text="Subject Breakdown",
+    command=open_subject_breakdown,
+    font=(
+        "Segoe UI",
+        9,
+        "bold",
+    ),
+    fg=WHITE,
+    bg=NAVY,
+    activebackground=NAVY_HOVER,
+    activeforeground=WHITE,
+    relief="flat",
+    padx=15,
+    pady=6,
+)
+
+breakdown_button.pack(
+    side="right"
+)
+
+
 delete_button = tk.Button(
     history_header,
     text="Delete Selected",
@@ -1363,8 +1738,10 @@ delete_button = tk.Button(
 )
 
 delete_button.pack(
-    side="right"
+    side="right",
+    padx=8,
 )
+
 
 edit_button = tk.Button(
     history_header,
@@ -1385,9 +1762,9 @@ edit_button = tk.Button(
 )
 
 edit_button.pack(
-    side="right",
-    padx=8,
+    side="right"
 )
+
 
 filter_frame = tk.Frame(
     history_card,
@@ -1399,6 +1776,7 @@ filter_frame.pack(
     padx=20,
     pady=(0, 12),
 )
+
 
 search_label = tk.Label(
     filter_frame,
@@ -1417,7 +1795,9 @@ search_label.pack(
     padx=(0, 8),
 )
 
+
 search_var = tk.StringVar()
+
 
 search_entry = tk.Entry(
     filter_frame,
@@ -1436,6 +1816,7 @@ search_entry.pack(
     ipady=5,
 )
 
+
 date_filter_label = tk.Label(
     filter_frame,
     text="Date",
@@ -1453,9 +1834,11 @@ date_filter_label.pack(
     padx=(15, 8),
 )
 
+
 date_filter_var = tk.StringVar(
     value="All Dates"
 )
+
 
 date_filter_combo = ttk.Combobox(
     filter_frame,
@@ -1467,6 +1850,7 @@ date_filter_combo = ttk.Combobox(
 date_filter_combo.pack(
     side="left"
 )
+
 
 clear_filters_button = tk.Button(
     filter_frame,
@@ -1489,6 +1873,7 @@ clear_filters_button.pack(
     padx=(10, 0),
 )
 
+
 search_count_label = tk.Label(
     filter_frame,
     text="0 session(s)",
@@ -1504,6 +1889,7 @@ search_count_label.pack(
     side="right"
 )
 
+
 table_frame = tk.Frame(
     history_card,
     bg=WHITE,
@@ -1516,6 +1902,7 @@ table_frame.pack(
     pady=(0, 18),
 )
 
+
 columns = (
     "number",
     "date",
@@ -1525,12 +1912,14 @@ columns = (
     "notes",
 )
 
+
 session_table = ttk.Treeview(
     table_frame,
     columns=columns,
     show="headings",
     selectmode="browse",
 )
+
 
 headings = {
     "number": "#",
@@ -1541,11 +1930,13 @@ headings = {
     "notes": "Notes",
 }
 
+
 for column, heading in headings.items():
     session_table.heading(
         column,
         text=heading,
     )
+
 
 session_table.column(
     "number",
@@ -1587,11 +1978,13 @@ session_table.column(
     anchor="w",
 )
 
+
 vertical_scrollbar = ttk.Scrollbar(
     table_frame,
     orient="vertical",
     command=session_table.yview,
 )
+
 
 horizontal_scrollbar = ttk.Scrollbar(
     table_frame,
@@ -1599,26 +1992,31 @@ horizontal_scrollbar = ttk.Scrollbar(
     command=session_table.xview,
 )
 
+
 session_table.configure(
     yscrollcommand=vertical_scrollbar.set,
     xscrollcommand=horizontal_scrollbar.set,
 )
+
 
 vertical_scrollbar.pack(
     side="right",
     fill="y",
 )
 
+
 horizontal_scrollbar.pack(
     side="bottom",
     fill="x",
 )
+
 
 session_table.pack(
     side="left",
     fill="both",
     expand=True,
 )
+
 
 footer = tk.Label(
     root,
@@ -1635,35 +2033,42 @@ footer.pack(
     pady=(0, 10)
 )
 
+
 subject_entry.bind(
     "<Return>",
     lambda event: minutes_entry.focus_set(),
 )
+
 
 minutes_entry.bind(
     "<Return>",
     lambda event: notes_text.focus_set(),
 )
 
+
 search_var.trace_add(
     "write",
     lambda *args: refresh_table(),
 )
+
 
 date_filter_combo.bind(
     "<<ComboboxSelected>>",
     refresh_table,
 )
 
+
 session_table.bind(
     "<Double-1>",
     lambda event: edit_selected(),
 )
 
+
 load_sessions()
 update_date_filter()
 refresh_table()
 update_statistics()
+
 
 if study_sessions:
     status_label.config(
@@ -1676,6 +2081,7 @@ else:
         text="No saved sessions yet.",
         fg=GRAY,
     )
+
 
 subject_entry.focus_set()
 

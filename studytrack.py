@@ -117,7 +117,10 @@ def load_sessions():
                 loaded_sessions.append(normalized)
 
         study_sessions = loaded_sessions
-        save_sessions(show_error=False)
+
+        save_sessions(
+            show_error=False
+        )
 
     except json.JSONDecodeError:
         study_sessions = []
@@ -725,9 +728,13 @@ def update_date_filter():
         *dates,
     ]
 
-    current_value = date_filter_var.get()
+    current_value = (
+        date_filter_var.get()
+    )
 
-    date_filter_combo["values"] = values
+    date_filter_combo[
+        "values"
+    ] = values
 
     if current_value not in values:
         date_filter_var.set(
@@ -761,6 +768,21 @@ def update_statistics():
         for session in study_sessions
     )
 
+    today = datetime.now().strftime(
+        "%Y-%m-%d"
+    )
+
+    today_minutes = sum(
+        int(
+            session.get(
+                "minutes",
+                0,
+            )
+        )
+        for session in study_sessions
+        if session.get("date", "") == today
+    )
+
     total_sessions_value.config(
         text=str(total_sessions)
     )
@@ -768,6 +790,12 @@ def update_statistics():
     total_time_value.config(
         text=format_total_time(
             total_minutes
+        )
+    )
+
+    today_time_value.config(
+        text=format_total_time(
+            today_minutes
         )
     )
 
@@ -838,7 +866,7 @@ def create_stat_card(parent, title):
         text="--",
         font=(
             "Segoe UI",
-            17,
+            16,
             "bold",
         ),
         fg=TEXT,
@@ -855,8 +883,8 @@ def create_stat_card(parent, title):
 root = tk.Tk()
 
 root.title("StudyTrack")
-root.geometry("1100x830")
-root.minsize(920, 700)
+root.geometry("1150x830")
+root.minsize(950, 700)
 root.configure(bg=BACKGROUND)
 
 header = tk.Frame(
@@ -1194,7 +1222,7 @@ sessions_card.pack(
     side="left",
     fill="x",
     expand=True,
-    padx=(0, 8),
+    padx=(0, 6),
 )
 
 time_card, total_time_value = create_stat_card(
@@ -1206,7 +1234,19 @@ time_card.pack(
     side="left",
     fill="x",
     expand=True,
-    padx=8,
+    padx=6,
+)
+
+today_card, today_time_value = create_stat_card(
+    stats_frame,
+    "Today's Study Time",
+)
+
+today_card.pack(
+    side="left",
+    fill="x",
+    expand=True,
+    padx=6,
 )
 
 subject_card, top_subject_value = create_stat_card(
@@ -1218,7 +1258,7 @@ subject_card.pack(
     side="left",
     fill="x",
     expand=True,
-    padx=(8, 0),
+    padx=(6, 0),
 )
 
 history_card = tk.Frame(
